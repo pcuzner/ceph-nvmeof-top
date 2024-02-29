@@ -6,7 +6,7 @@ The easiest way to test the tool is via a container image
 
 Show the command options
 ```
-# podman run --rm --interactive --tty --net host quay.io/pcuzner/nvmeof-top:latest -h
+# podman run --rm --interactive --tty --net host quay.io/cuznerp/nvmeof-top:latest -h
 usage: nvmeof-top.py [-h] [--delay DELAY] [--mode {batch,console}] --subsystem SUBSYSTEM [--server-addr SERVER_ADDR] [--server-port SERVER_PORT]
                      [--with-timestamp] [--no-headings] [--count COUNT]
 
@@ -30,7 +30,7 @@ options:
 
 Run the tool against the subsystem 'nqn.2016-06.io.spdk:cnode1' on gateway at 192.168.122.48
 ```
-# podman run --rm --interactive --tty --net host -e SERVER_ADDR=192.168.122.48 quay.io/pcuzner/nvmeof-top:latest -n nqn.2016-06.io.spdk:cnode1 --with-timestamp
+# podman run --rm --interactive --tty --net host -e SERVER_ADDR=192.168.122.48 quay.io/cuznerp/nvmeof-top:latest -n nqn.2016-06.io.spdk:cnode1 --with-timestamp
 waiting for samples...
 2024-02-29 22:25:32
 NSID  RBD pool/image                         r/s    rMB/s  r_await  rareq-sz     w/s   wMB/s  w_await  wareq-sz  LBGrp   QoS
@@ -59,13 +59,13 @@ nvmeof-top stopped.
 
 To make it easier to run, just set up an alias in your .bashrc file  
 ```
-alias nvmeof-top='podman run --rm --interactive --tty --net host -e SERVER_ADDR=192.168.122.48 quay.io/pcuzner/nvmeof-top:latest'
+alias nvmeof-top='podman run --rm --interactive --tty --net host -e SERVER_ADDR=192.168.122.48 quay.io/cuznerp/nvmeof-top:latest'
 ```
-then just run `nvmeof-top` :) 
+then just run `nvmeof-top` :wink: 
 
 ## TO-DO List
 - [x] test out dependencies in a virt env  
-- [ ] build a container and push to quay.io
+- [x] build a container and push to quay.io
 - [ ] Add logging
 - [ ] Add timing to the log for each collect cycle
 - [ ] Add a simple urwid implementation
