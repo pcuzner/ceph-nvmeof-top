@@ -63,6 +63,8 @@ alias nvmeof-top='podman run --rm --interactive --tty --net host -e SERVER_ADDR=
 ```
 then just run `nvmeof-top` :wink: 
 
+![demo](assets/nvmeof-top-cmd.gif)
+
 ## TO-DO List
 - [x] test out dependencies in a virt env  
 - [x] build a container and push to quay.io
