@@ -6,6 +6,9 @@ import threading
 import time
 from typing import List
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class NVMeoFTop:
@@ -19,7 +22,7 @@ class NVMeoFTop:
 
     def to_stdout(self):
         """Dump information to stdout"""
-
+        logger.debug("writing stats to stdout")
         with self.collector.lock:
             ns_data = self.collector.namespaces
 
@@ -40,9 +43,13 @@ class NVMeoFTop:
         print(''.join(rows), end='')
 
     def build_ns_row(self, ns) -> List[str]:
+
         rbd_info = f"{ns.rbd_pool_name}/{ns.rbd_image_name}"
         bdev_name = ns.bdev_name
+
         perf_stats = self.collector.iostats[bdev_name]
+        logger.debug(f"building row for namespace {ns.nsid} from {self.args.subsystem}")
+
         read_ops = perf_stats.read_ops.rate(self.args.delay)
         read_secs = perf_stats.read_secs.rate(self.args.delay)
         read_bytes = perf_stats.read_bytes.rate(self.args.delay)
@@ -83,7 +90,12 @@ class NVMeoFTop:
             return "Yes"
         return "No"
 
+    def console_mode(self):
+        logger.info(f"Running in console mode: {self.args.subsystem}")
+        pass
+
     def batch_mode(self):
+        logger.info(f"Running in batch mode: {self.args.subsystem}")
         event = threading.Event()
         ctr = 0
         try:
@@ -101,11 +113,12 @@ class NVMeoFTop:
                 event.wait(self.args.delay)
 
         except KeyboardInterrupt:
-            pass
+            logger.info("nvmeof-top stopped by user")
 
         print("\nnvmeof-top stopped.")
 
     def abort(self, rc: int, msg: str):
+        logger.critical(f"collector has hit a problem: {self.collector.health.msg}")
         print(msg)
         sys.exit(rc)
 
@@ -120,3 +133,5 @@ class NVMeoFTop:
 
         if self.args.mode == "batch":
             self.batch_mode()
+        else:
+            self.console_mode()
