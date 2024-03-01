@@ -1,6 +1,15 @@
+import sys
 import uuid
 import regex
 import argparse
+import logging
+logger = logging.getLogger(__name__)
+
+
+def abort(rc: int, msg: str):
+    logger.critical(f"nvmeof-top has hit a problem: {msg}")
+    print(msg)
+    sys.exit(rc)
 
 
 def lb_group(grp_id: int):
