@@ -3,8 +3,10 @@ import threading
 import nvmeof_top.proto.gateway_pb2 as pb2
 import time
 import grpc
+import logging
 
 event = threading.Event()
+logger = logging.getLogger(__name__)
 
 
 class Health:
@@ -25,8 +27,6 @@ class IOStatCounter:
 
     def rate(self, interval: float):
         """Calculate the per second change rate"""
-        if self.last == 0 or self.current < self.last:
-            return 0.0
         return (self.current - self.last) / interval
 
 
@@ -71,14 +71,18 @@ class DataCollector:
         return self._sample_count == self._min_sample_count
 
     def call_grpc_api(self, method_name, request):
+        logger.debug(f"calling gprc method {method_name}")
         try:
             func = getattr(self.client.stub, method_name)
             data = func(request)
         except grpc._channel._InactiveRpcError:
             self.health.rc = 8
             self.health.msg = f"RPC endpoint unavailable at {self.client.server}"
+            logger.error(f"gprc call to {method_name} failed: {self.health.msg}")
             return None
+
         self.health.msg = f"{method_name} success"
+        logger.debug(f"call to {method_name} successful")
         return data
 
     def set_gw_info(self):
@@ -104,6 +108,7 @@ class DataCollector:
             self.connections = tg.create_task(asyncio.to_thread(self._get_connections))
 
     def _get_ns_iostats(self, ns):
+        logger.debug(f"fetching iostats for namespace {ns.nsid}")
         with self.iostats_lock:
             if ns.bdev_name not in self.iostats:
                 self.iostats[ns.bdev_name] = PerformanceStats(ns.bdev_name)
@@ -130,8 +135,12 @@ class DataCollector:
     async def start(self):
         while not event.is_set():
             with self.lock:
+                start = time.time()
                 await self.collect_data()
+                logger.info(f"data collection took: {(time.time() - start):3.3f} secs")
+
                 if not self.ready:
+                    logger.error("Error encounted during data collection, terminating async loop")
                     return
                 self.timestamp = time.time()
             event.wait(self.delay)

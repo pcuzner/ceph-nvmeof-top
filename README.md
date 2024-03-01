@@ -68,6 +68,6 @@ then just run `nvmeof-top` :wink:
 ## TO-DO List
 - [x] test out dependencies in a virt env  
 - [x] build a container and push to quay.io
-- [ ] Add logging
-- [ ] Add timing to the log for each collect cycle
+- [x] Add logging
+- [x] Add timing to the log for each collect cycle
 - [ ] Add a simple urwid implementation
