@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class NVMeoFTop:
-    text_headers = ['NSID', 'RBD pool/image', 'r/s', 'rMB/s', 'r_await', 'rareq-sz', 'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS']
-    text_template = "{:>4}  {:<32}    {:>6}   {:>6}  {:>7}  {:>8}  {:>6}  {:>6}  {:>7}  {:>8}  {:^5}   {:>3}\n"
+    text_headers = ['NSID', 'RBD pool/image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz', 'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS']
+    text_template = "{:>4}  {:<32}    {:>7}  {:>6}   {:>6}  {:>7}  {:>8}  {:>6}  {:>6}  {:>7}  {:>8}  {:^5}   {:>3}\n"
 
     def __init__(self, args: argparse.Namespace, client: GatewayClient):
         self.client = client
@@ -56,6 +56,7 @@ class NVMeoFTop:
         write_ops = perf_stats.write_ops.rate(self.args.delay)
         write_secs = perf_stats.write_secs.rate(self.args.delay)
         write_bytes = perf_stats.write_bytes.rate(self.args.delay)
+        total_iops = read_ops + write_ops
 
         if read_ops:
             rareq_sz = (int(read_bytes / read_ops) / 1024)
@@ -73,6 +74,7 @@ class NVMeoFTop:
         return [
             ns.nsid,
             rbd_info,
+            int(total_iops),
             int(read_ops),
             f"{bytes_to_MB(read_bytes):3.2f}",
             f"{r_await:3.2f}",
