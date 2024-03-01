@@ -5,6 +5,12 @@ from nvmeof_top import NVMeoFTop
 from nvmeof_top.grpc import GatewayClient
 from nvmeof_top.utils import valid_nqn
 import nvmeof_top.defaults as DEFAULT
+import logging
+
+logging.basicConfig(
+    filename='nvmeof-top.log',
+    filemode='w',
+    format='%(asctime)s - %(levelname)-8s - %(name)s.%(funcName)s - %(msg)s')
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -17,6 +23,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--with-timestamp", action='store_true', default=False, help="Prefix namespaces statistics with a timestamp in batch mode")
     parser.add_argument("--no-headings", action='store_true', default=False, help="Omit column headings in batch mode")
     parser.add_argument("--count", "-c", type=int, help="Number of interations for stats gathering")
+    parser.add_argument("--log-level", type=str, choices=['debug', 'info', 'warning', 'error', 'critical'], default=DEFAULT.log_level, help=f"Logging level [{DEFAULT.log_level}]")
 
     args = parser.parse_args()
 
@@ -29,6 +36,9 @@ if __name__ == "__main__":
     if not args.server_addr or not args.server_port:
         print("IP and port required: Either set SERVER_ADDR and SERVER_PORT environment variables or provide them as parameters")
         sys.exit(4)
+
+    # set the root loggers default log level
+    logging.getLogger().setLevel(args.log_level.upper())
 
     gateway_client = GatewayClient(
         server_addr=args.server_addr,
