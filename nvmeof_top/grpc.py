@@ -4,7 +4,12 @@ import grpc
 
 class GatewayClient:
 
-    def __init__(self, server_addr: str, server_port: int):
+    def __init__(self, server_addr: str,
+                 server_port: int,
+                 server_cert_path: str = '',
+                 client_cert_path: str = '',
+                 client_key_path: str = '',
+                 ssl_config: str = ''):
         self.server_addr = server_addr
         self.server_port = server_port
         self._stub = None
