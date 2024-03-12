@@ -13,3 +13,11 @@ python3 -m grpc_tools.protoc --proto_path=/home/paul/src/ceph-nvmeof-top/nvmeof_
 
 ^^ needs revision. the resulting gateway_pb2_grpc.py file is not using the correct import path to pick up gateway_pb2.py
 needed a prefix of nvmeof_top.proto
+
+
+## Testing
+The tool has a bultin dummy data collector that will generate sane IO and cpu values. You can use this mode to work on UI changes without needing access to a running nvmeof gateway.
+
+```
+python3 ./nvmeof-top.py --log-level=debug --demo=10
+```
