@@ -13,6 +13,7 @@ IMAGE="alpine:edge"
 container=$(buildah from $IMAGE)
 buildah run $container apk add python3
 buildah run $container apk add py3-setuptools
+buildah run $container apk add py3-yaml
 buildah run $container apk add py3-grpcio --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/
 buildah run $container apk add py3-protobuf --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/
 buildah run $container apk add py3-regex --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/
@@ -28,6 +29,7 @@ buildah config --env PS1="[nvmeof-top] \w\$ " $container
 buildah config --env TERM="xterm-256color" $container
 buildah config --workingdir /nvmeof-top $container
 buildah config --entrypoint '["python3", "./nvmeof-top.py"]' $container
+buildah config --cmd '["-h"]' $container
 
 
 buildah config --label maintainer="Paul Cuzner <pcuzner@redhat.com>" $container
