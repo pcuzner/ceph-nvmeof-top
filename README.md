@@ -86,7 +86,11 @@ In the above example demo is set to 10, so the display will show activity across
 
 ## Example Output
 
-![demo](assets/nvmeof-top.mp4)
+
+https://github.com/pcuzner/ceph-nvmeof-top/assets/3703087/f5b2aa72-592b-4f57-b1f1-4870b3c41843
+
+
+
 
 ## TO-DO List
 - [x] test out dependencies in a virt env  
