@@ -1,30 +1,67 @@
 import argparse
+# import os
 from .grpc import GatewayClient
-from nvmeof_top.collector import DataCollector
-from nvmeof_top.utils import bytes_to_MB, lb_group
+from nvmeof_top.collector import DataCollector, DummyCollector
+from nvmeof_top.utils import abort
 import threading
 import time
-from typing import List
-import sys
 import logging
+import urwid
+from nvmeof_top.ui import palette, Header, SubsystemInfo, NamespaceTable, HelpInformation, Options, CPUStats
 
 logger = logging.getLogger(__name__)
 
 
 class NVMeoFTop:
     text_headers = ['NSID', 'RBD pool/image', 'IOPS', 'r/s', 'rMB/s', 'r_await', 'rareq-sz', 'w/s', 'wMB/s', 'w_await', 'wareq-sz', 'LBGrp', 'QoS']
-    text_template = "{:>4}  {:<32}    {:>7}  {:>6}   {:>6}  {:>7}  {:>8}  {:>6}  {:>6}  {:>7}  {:>8}  {:^5}   {:>3}\n"
+    text_template = "{:>4}   {:<40}   {:>7}   {:>6}   {:>6}   {:>7}   {:>8}   {:>6}   {:>6}   {:>7}   {:>8}   {:^5}   {:>3}\n"
 
     def __init__(self, args: argparse.Namespace, client: GatewayClient):
         self.client = client
         self.args = args
+        self.delay = args.delay
+        self.subsystem_nqn = args.subsystem
         self.collector: DataCollector
+        self.ui_loop: urwid.MainLoop
+
+        # these variables are used to hold the UI objects
+        self.header = None
+        self.cpustats = None
+        self.subsystem = None
+        self.namespaces = None
+
+        # this list should match the UI object names. It is iterated over to call the update() methods
+        # of each UI component
+        self.panels = [
+            'header',
+            'cpustats',
+            'subsystem',
+            'namespaces'
+        ]
+
+        self.cpu_per_core = False
+        self.ui = None
+        self.components = None
+        self.options = None
+        self.sort_key = 'NSID'
+        self.refresh_paused = False
+        self.reverse_sort = False
+
+        self.help = None
+        self.read_latency_threshold = 0
+        self.write_latency_threshold = 0
+
+    @property
+    def debug(self):
+        return self.args.demo is not None
 
     def to_stdout(self):
-        """Dump information to stdout"""
+        """Dump namespace performance stats to stdout"""
         logger.debug("writing stats to stdout")
+        sort_pos = NVMeoFTop.text_headers.index(self.sort_key)
         with self.collector.lock:
-            ns_data = self.collector.namespaces
+            ns_data = self.collector.get_sorted_namespaces(sort_pos=sort_pos)
+            # ns_data = self.collector.namespaces
 
         rows = []
         if self.args.with_timestamp:
@@ -33,78 +70,200 @@ class NVMeoFTop:
         if not self.args.no_headings:
             rows.append(NVMeoFTop.text_template.format(*NVMeoFTop.text_headers))
         if ns_data:
-            ns_data.sort(key=lambda x: x.nsid, reverse=False)
+            # ns_data.sort(key=lambda x: x.nsid, reverse=False)
             for ns in ns_data:
-                row = self.build_ns_row(ns)
-                rows.append(NVMeoFTop.text_template.format(*row))
+                # row = self.build_ns_row(ns)
+                rows.append(NVMeoFTop.text_template.format(*ns))
         else:
-            rows.append("<no namespaces defined>")
+            rows.append("<no namespaces defined>\n")
 
         print(''.join(rows), end='')
 
-    def build_ns_row(self, ns) -> List[str]:
+    def options_handler(self, user_data):
+        """Callback handler invoked when the user hits 'Apply' in the Options screen"""
+        logger.debug(f"received {user_data}")
+        logger.info("applying any changes to runtime options")
 
-        rbd_info = f"{ns.rbd_pool_name}/{ns.rbd_image_name}"
-        bdev_name = ns.bdev_name
+        if user_data['subsystem'] != self.subsystem_nqn:
+            logger.info(f"Changing subsystem collection to {user_data['subsystem']}")
+            self.collector.update_subsystem(user_data['subsystem'])
+            self.subsystem_nqn = user_data['subsystem']
+            self.subsystem.update()
 
-        perf_stats = self.collector.iostats[bdev_name]
-        logger.debug(f"building row for namespace {ns.nsid} from {self.args.subsystem}")
+        if user_data['sort_key'] != self.sort_key:
+            logger.debug(f"changing sort key from {self.sort_key} to {user_data['sort_key']}")
+            self.sort_key = user_data['sort_key']
+            self.namespaces.update()
 
-        read_ops = perf_stats.read_ops.rate(self.args.delay)
-        read_secs = perf_stats.read_secs.rate(self.args.delay)
-        read_bytes = perf_stats.read_bytes.rate(self.args.delay)
-        write_ops = perf_stats.write_ops.rate(self.args.delay)
-        write_secs = perf_stats.write_secs.rate(self.args.delay)
-        write_bytes = perf_stats.write_bytes.rate(self.args.delay)
-        total_iops = read_ops + write_ops
+        if self.delay != user_data['delay']:
+            logger.debug(f"changing refresh delay from {self.delay} to {user_data['delay']}")
 
-        if read_ops:
-            rareq_sz = (int(read_bytes / read_ops) / 1024)
-            r_await = ((read_secs / read_ops) * 1000)  # for ms
-        else:
-            rareq_sz = 0.0
-            r_await = 0.0
-        if write_ops:
-            wareq_sz = (int(write_bytes / write_ops) / 1024)
-            w_await = ((write_secs / write_ops) * 1000)  # for ms
-        else:
-            wareq_sz = 0.0
-            w_await = 0.0
+            self.delay = user_data['delay']
 
-        return [
-            ns.nsid,
-            rbd_info,
-            int(total_iops),
-            int(read_ops),
-            f"{bytes_to_MB(read_bytes):3.2f}",
-            f"{r_await:3.2f}",
-            f"{rareq_sz:4.2f}",
-            int(write_ops),
-            f"{bytes_to_MB(write_bytes):3.2f}",
-            f"{w_await:3.2f}",
-            f"{wareq_sz:4.2f}",
-            lb_group(ns.load_balancing_group),
-            self.qos_enabled(ns)
-        ]
+        if self.read_latency_threshold != user_data['read_latency_threshold']:
+            logger.debug(f"changing read latency threshold from {self.read_latency_threshold} to {user_data['read_latency_threshold']}")
+            self.read_latency_threshold = user_data['read_latency_threshold']
+            self.namespaces.update()
 
-    def qos_enabled(self, ns) -> str:
-        if (ns.rw_ios_per_second or ns.rw_mbytes_per_second or ns.r_mbytes_per_second or ns.w_mbytes_per_second):
-            return "Yes"
-        return "No"
+        if self.write_latency_threshold != user_data['write_latency_threshold']:
+            logger.debug(f"changing write latency threshold from {self.write_latency_threshold} to {user_data['write_latency_threshold']}")
+            self.write_latency_threshold = user_data['write_latency_threshold']
+            self.namespaces.update()
 
-    def console_mode(self):
-        logger.info(f"Running in console mode: {self.args.subsystem}")
-        pass
+        self.options.visible = False
+        self.reset_ui()
 
-    def batch_mode(self):
-        logger.info(f"Running in batch mode: {self.args.subsystem}")
+    def reset_ui(self):
+        self.loop.widget = self.ui
+
+    @property
+    def modal_active(self) -> bool:
+        return self.help.visible or self.options.visible
+
+    def quit_ui(self) -> None:
+        logger.info("User has pressed 'q' or 'esc' to quit the ui")
+        raise urwid.ExitMainLoop
+
+    def default_key_handler(self, key) -> None:
+        """Define the default handler for keypresses not managed by child components"""
+        if key in ['Q', 'q']:
+            self.quit_ui()
+        elif key == 'esc':
+            if not self.modal_active:
+                self.quit_ui()
+            if self.help.visible:
+                logger.debug('esc pressed, hiding the help modal')
+                self.help.visible = False
+                self.loop.widget = self.ui
+                return
+            if self.options.visible:
+                logger.debug('esc pressed, option changes skipped')
+                self.options.visible = False
+                self.loop.widget = self.ui
+                return
+        elif key in ['P', 'p']:
+            self.refresh_paused = not self.refresh_paused
+            pause_state = 'paused' if self.refresh_paused else 'resumed'
+            logger.info(f"User {pause_state} the refresh")
+            self.header.update()
+            return
+
+        if not self.refresh_paused:
+
+            if key in ['c', 'C'] and self.collector.cpustats_enabled:
+                self.cpu_per_core = not self.cpu_per_core
+                logger.debug(f"Show cpu usage per core: {self.cpu_per_core}")
+                self.cpustats.update()
+                return
+            elif key in ['O', 'o']:
+                if self.refresh_paused:
+                    return
+
+                self.options.visible = not self.options.visible
+                if self.options.visible:
+                    # +2 is added to the height to account for the line border
+                    self.loop.widget = urwid.Overlay(
+                        self.options,
+                        self.ui,
+                        align=("relative", 50),
+                        valign=("relative", 50),
+                        width=("relative", 60),
+                        height=(self.options.page_height + 2),
+                        min_width=50)
+                else:
+                    self.loop.widget = self.ui
+
+            elif key in ['s', 'S']:
+                logger.info('changing the namespace sort direction')
+                self.reverse_sort = not self.reverse_sort
+                self.namespaces.update()
+                return
+            elif key in ('H', 'h'):
+                self.help.visible = not self.help.visible
+                if self.help.visible:
+
+                    # +2 is added to the height to account for the line border
+                    self.loop.widget = urwid.Overlay(
+                        self.help,
+                        self.ui,
+                        align=("relative", 50),
+                        valign=("relative", 50),
+                        width=("relative", 60),
+                        height=(self.help.page_height + 2),
+                        min_width=50)
+                else:
+                    self.loop.widget = self.ui
+
+        logger.debug(f"ui parent has received an unmanaged {key} keypress")
+
+    def _build_ui(self) -> urwid.Frame:
+        """Create the layout of the App"""
+
+        title_colors = 'title-debug' if self.debug else 'title'
+        title = urwid.AttrMap(self.header, title_colors)
+        self.components = urwid.Pile([
+            self.cpustats,
+            self.subsystem,
+            urwid.Divider(),
+            self.namespaces
+        ])
+        self.body = urwid.Filler(
+            self.components,
+            valign='top'
+        )
+
+        return urwid.Frame(
+            self.body,
+            header=title,
+            footer=None
+        )
+
+    def _update_panels(self) -> None:
+        logger.debug("running _update_panels")
+        for panel_name in self.panels:
+            panel = getattr(self, panel_name)
+            panel.update()
+
+    def refresh_ui(self, loop_object, data) -> None:
+        if not self.refresh_paused:
+            logger.debug("updating all panels")
+            self._update_panels()
+
+        self.loop.set_alarm_at(time.time() + self.delay, self.refresh_ui, None)
+
+    def console_mode(self) -> None:
+        logger.info(f"Running in console mode querying {self.args.subsystem}")
+        self.help = HelpInformation(self)
+        self.header = Header(self)
+        self.cpustats = CPUStats(self)
+        self.subsystem = SubsystemInfo(self)
+        self.namespaces = NamespaceTable(self, NVMeoFTop.text_headers, NVMeoFTop.text_template)
+        self.options = Options(self, self.options_handler)
+        self.options.visible = False
+        self.ui = self._build_ui()
+        self.loop = urwid.MainLoop(
+            self.ui,
+            palette=palette,
+            unhandled_input=self.default_key_handler
+        )
+        self.loop.set_alarm_at(time.time() + self.delay, self.refresh_ui, None)
+
+        try:
+            self.loop.run()
+        except urwid.widget.WidgetError:
+            abort(12, "Terminal window is too small")
+        except KeyboardInterrupt:
+            abort(0, "User quit with CTRL-C")
+
+    def batch_mode(self) -> None:
+        logger.info(f"Running in batch mode querying {self.args.subsystem}")
         event = threading.Event()
         ctr = 0
         try:
             print("waiting for samples...")
             while not event.is_set():
                 if not self.collector.ready:
-                    self.abort(self.collector.health.rc, self.collector.health.msg)
+                    abort(self.collector.health.rc, self.collector.health.msg)
 
                 if self.collector.samples_ready:
                     self.to_stdout()
@@ -112,28 +271,28 @@ class NVMeoFTop:
                         ctr += 1
                         if ctr > self.args.count:
                             break
-                event.wait(self.args.delay)
+                event.wait(self.delay)
 
         except KeyboardInterrupt:
             logger.info("nvmeof-top stopped by user")
 
         print("\nnvmeof-top stopped.")
 
-    def abort(self, rc: int, msg: str):
-        logger.critical(f"collector has hit a problem: {self.collector.health.msg}")
-        print(msg)
-        sys.exit(rc)
+    def run(self) -> None:
+        if self.debug:
+            self.collector = DummyCollector(self, self.args.demo)
+        else:
+            self.collector = DataCollector(self)
+        logger.info(f"nvmeof-top running with a {self.collector.__class__.__name__} collector")
 
-    def run(self):
-        self.collector = DataCollector(self.client, self.args.delay, self.args.subsystem)
         self.collector.initialise()
         if not self.collector.ready:
-            self.abort(self.collector.health.rc, self.collector.health.msg)
+            abort(self.collector.health.rc, self.collector.health.msg)
 
         t = threading.Thread(target=self.collector.run, daemon=True)
         t.start()
 
-        if self.args.mode == "batch":
+        if self.args.batch:
             self.batch_mode()
         else:
             self.console_mode()
