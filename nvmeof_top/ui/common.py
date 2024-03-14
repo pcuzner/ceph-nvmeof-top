@@ -1,4 +1,4 @@
-import urwid  # noqa: F401
+import urwid  # noqa: F401 type: ignore
 import string
 
 palette = [
