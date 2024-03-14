@@ -1,13 +1,13 @@
 import argparse
-# import os
 from .grpc import GatewayClient
 from nvmeof_top.collector import DataCollector, DummyCollector
 from nvmeof_top.utils import abort
 import threading
 import time
 import logging
-import urwid
+import urwid  # type: ignore
 from nvmeof_top.ui import palette, Header, SubsystemInfo, NamespaceTable, HelpInformation, Options, CPUStats
+from typing import Union
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +21,14 @@ class NVMeoFTop:
         self.args = args
         self.delay = args.delay
         self.subsystem_nqn = args.subsystem
-        self.collector: DataCollector
+        self.collector: Union[DataCollector, DummyCollector]
         self.ui_loop: urwid.MainLoop
 
         # these variables are used to hold the UI objects
-        self.header = None
-        self.cpustats = None
-        self.subsystem = None
-        self.namespaces = None
+        self.header: Header
+        self.cpustats: CPUStats
+        self.subsystem: SubsystemInfo
+        self.namespaces: NamespaceTable
 
         # this list should match the UI object names. It is iterated over to call the update() methods
         # of each UI component
@@ -42,12 +42,12 @@ class NVMeoFTop:
         self.cpu_per_core = False
         self.ui = None
         self.components = None
-        self.options = None
+        self.options: Options
         self.sort_key = 'NSID'
         self.refresh_paused = False
         self.reverse_sort = False
 
-        self.help = None
+        self.help: HelpInformation
         self.read_latency_threshold = 0
         self.write_latency_threshold = 0
 
