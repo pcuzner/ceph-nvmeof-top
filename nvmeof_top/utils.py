@@ -1,9 +1,9 @@
 import os
 import sys
 import uuid
-import regex
+import regex  # type: ignore
 import logging
-import yaml
+import yaml  # type: ignore
 from typing import Tuple
 logger = logging.getLogger(__name__)
 
@@ -24,13 +24,14 @@ def certs_ok(args) -> Tuple[bool, str]:
     if args.ssl_config and any(ssl_cert_files):
         return False, "Use ssl-config OR individual cert key file names, not both"
 
+    # if server/client/key parameters ensure the files all exist
     if all(ssl_cert_files):
         if not all([os.path.exists(f) for f in ssl_cert_files]):
             return False, "One or more cert files not found, please check the paths provided"
 
-    # if server/client/key parameters ensure the files all exist
+    # if a single ssl_config file is given, validate it
     if args.ssl_config:
-        ok, msg = validate_ssl_config()
+        ok, msg = validate_ssl_config(args.ssl_config)
         if not ok:
             return False, msg
     return True, "ok"
