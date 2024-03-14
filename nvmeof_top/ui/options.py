@@ -1,8 +1,9 @@
-import urwid
+import urwid  # type: ignore
 import logging
 from .common import GenericComponent, BoxButton, FixedEdit
 from nvmeof_top.utils import valid_nqn
 import string
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,7 @@ class Options(GenericComponent):
         self.input_subsystem = FixedEdit(caption="Subsystem: ", edit_text=self.current_subsystem, multiline=False, align='left', allow_tab=False, width=40)
         self.input_read_threshold = FixedEdit(caption="Read Latency (ms): ", edit_text=str(self.parent.read_latency_threshold), width=2, valid_chars=string.digits)
         self.input_write_threshold = FixedEdit(caption="Write Latency (ms): ", edit_text=str(self.parent.write_latency_threshold), width=2, valid_chars=string.digits)
-        sort_options = []
+        sort_options: List[urwid.RadioButton] = []
         for key in self.parent.text_headers:
             urwid.RadioButton(sort_options, label=key, on_state_change=self.update_sort_key, user_data=key)
 
