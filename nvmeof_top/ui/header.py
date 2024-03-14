@@ -1,4 +1,4 @@
-import urwid
+import urwid  # type: ignore
 import time
 from .common import GenericComponent
 import logging
