@@ -3,7 +3,7 @@ import threading
 import nvmeof_top.proto.gateway_pb2 as pb2
 import time
 import random
-import grpc
+import grpc  # type: ignore
 import logging
 from .utils import lb_group, bytes_to_MB
 from typing import Dict
