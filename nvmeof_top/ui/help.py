@@ -1,4 +1,4 @@
-import urwid
+import urwid  # type: ignore
 from .common import GenericComponent
 import logging
 
@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 class HelpInformation(GenericComponent):
     divide_chars = 3
 
-    def __init__(self, parent):
+    def __init__(self, parent) -> None:
         self.parent = parent
         super().__init__()
 
-        self.visible = False
+        self.visible: bool = False
 
     @property
     def page_height(self):
