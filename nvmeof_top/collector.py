@@ -114,9 +114,8 @@ class Collector:
         self.parent = parent
         self.client = self.parent.client
         self.subsystem_nqn = self.parent.subsystem_nqn
-        self.nqn_list = []
         self.namespaces = []
-        self.subsystems = None
+        self.subsystems = []
         self.connection_info = None
         self.cpustats_enabled = False
         self.thread_stats = {}
@@ -131,11 +130,17 @@ class Collector:
 
     def update_subsystem(self, new_subsystem_nqn: str) -> None:
         logger.info(f"updating subsystem to scan from {self.subsystem_nqn} to {new_subsystem_nqn}")
-        self.subsystem_nqn = new_subsystem_nqn
+        with self.lock:
+            self.subsystem_nqn = new_subsystem_nqn
+            self.reset_namespace_data()
 
     @property
     def total_iops(self):
         return int(sum([stats.total_ops_rate for _, stats in self.iostats.items()]))
+
+    @property
+    def nqn_list(self):
+        return [subsys.nqn for subsys in self.subsystems.subsystems]
 
     @property
     def total_bandwidth(self):
@@ -175,9 +180,15 @@ class Collector:
     def reactor_cores(self) -> int:
         return len(self.thread_stats.keys())
 
+    def reset_namespace_data(self):
+        logger.debug("resetting namespace and io counters due to subsystem change")
+        self._sample_count = 0
+        self.namespaces.clear()
+        self.iostats.clear()
+
     def log_connection(self):
         logger.info(f"Connected to {self.parent.args.server_addr}")
-        logger.info(f"Gateway has {self.total_subsystems} subsystems")
+        logger.info(f"Gateway has {self.total_subsystems} subsystems defined")
 
     def get_sorted_namespaces(self, sort_pos: int, active_only: bool = False):
         ns_data = []
@@ -233,14 +244,13 @@ class DataCollector(Collector):
             logger.error('Unable to retrieve gataway information')
             return
 
-        subsys_info = self._get_all_subsystems()
-        if subsys_info.status > 0:
-            logger.error(f"Call to list_subsystems failed, RC={subsys_info.status}, MSG={subsys_info.error_message}")
+        self.subsystems = self._get_all_subsystems()
+        if self.subsystems.status > 0:
+            logger.error(f"Call to list_subsystems failed, RC={self.subsystems.status}, MSG={self.subsystems.error_message}")
             self.health.rc = 8
             self.health.msg = "Unable to retrieve a list of subsystems"
             return
 
-        self.nqn_list = [subsys.nqn for subsys in subsys_info.subsystems]
         if self.total_subsystems == 0:
             self.health.rc = 8
             self.health.msg = 'No subsystems found'
@@ -368,21 +378,21 @@ class DummyCollector(Collector):
         gw.name = 'made-up'
         gw.spdk_version = '23.01.1'
         self.gw_info = gw
-        self.nqn_list = [
-            'nqn.2016-06.io.spdk:cnode1',
-            'nqn.2016-06.io.spdk:cnode2'
-        ]
+
+        self.subsystems = self._get_subsystems()
 
         self.log_connection()
 
     def _get_namespaces(self):
         namespaces = []
+        subsystem_suffix = self.subsystem_nqn.split(':')[1]
+
         for n in range(1, self.namespace_count + 1, 1):
             ns = DummyObject()
             ns.nsid = n
-            ns.bdev_name = f"bdev_{n}"
+            ns.bdev_name = f"{subsystem_suffix}_bdev_{n}"
             ns.rbd_pool_name = 'rbd'
-            ns.rbd_image_name = f"image_{n}"
+            ns.rbd_image_name = f"{subsystem_suffix}_image_{n}"
             ns.load_balancing_group = 0
             ns.rw_ios_per_second = 0
             ns.rw_mbytes_per_second = 0
@@ -392,12 +402,15 @@ class DummyCollector(Collector):
         return namespaces
 
     def _get_subsystems(self):
-        subsystem_list = []
-        subsystem = DummyObject()
-        subsystem.nqn = 'nqn.2016-06.io.spdk:cnode1'
-        subsystem.max_namespaces = 256
-        subsystem_list.append(subsystem)
-        return subsystem_list
+        subsystems = DummyObject()
+        subsystems.status = 0
+        subsystems.subsystems = []
+        for n in range(1, 3, 1):
+            subsys = DummyObject()
+            subsys.nqn = f"nqn.2016-06.io.spdk:cnode{n}"
+            subsys.max_namespaces = 256
+            subsystems.subsystems.append(subsys)
+        return subsystems
 
     def _get_connections(self):
         connection_info = DummyObject()
