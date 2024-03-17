@@ -89,6 +89,7 @@ class NVMeoFTop:
             self.collector.update_subsystem(user_data['subsystem'])
             self.subsystem_nqn = user_data['subsystem']
             self.subsystem.update()
+            self.collector.reset_namespace_data()
 
         if user_data['sort_key'] != self.sort_key:
             logger.debug(f"changing sort key from {self.sort_key} to {user_data['sort_key']}")
@@ -244,6 +245,7 @@ class NVMeoFTop:
         self.loop = urwid.MainLoop(
             self.ui,
             palette=palette,
+            pop_ups=True,
             unhandled_input=self.default_key_handler
         )
         self.loop.set_alarm_at(time.time() + self.delay, self.refresh_ui, None)
