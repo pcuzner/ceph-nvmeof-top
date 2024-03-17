@@ -1,5 +1,8 @@
 import urwid  # noqa: F401 type: ignore
+from typing import List, ClassVar
 import string
+import logging
+logger = logging.getLogger(__name__)
 
 palette = [
     ('title', 'dark blue,bold', ''),
@@ -19,7 +22,8 @@ palette = [
     ('bar busy:bar idle', 'dark green', 'dark gray'),
     ('pb normal', 'white', '', 'standout'),
     ('pb complete', 'white', 'dark blue'),
-    ('pb smooth', 'dark blue', '')
+    ('pb smooth', 'dark blue', ''),
+    ('reveal focus', 'black', 'dark blue', 'standout')
 ]
 
 BLOCK_HORIZONTAL = [chr(x) for x in range(0x258F, 0x2587, -1)]
@@ -102,3 +106,108 @@ class FixedEdit(urwid.Edit):
         else:
             # otherwise check for the validity of the key
             return True if ch in self.valid_chars else False
+
+
+class PullDownOptions:
+    def __init__(self, options_list: List[str], min_width: int = 20, default: int = 0):
+        self.items = options_list
+        self.min_width = min_width
+        self._default = default
+
+    @property
+    def width(self):
+        max_options_width = max([len(item) for item in self.items])
+        return max([self.min_width, max_options_width]) + 7
+
+    @property
+    def default(self):
+        return self.items[self._default]
+
+
+class CustomButton(urwid.Button):
+    button_left = urwid.Text('')
+    button_right = urwid.Text('\u25bc')  # down arrow
+
+
+class SelectableText(urwid.Text):
+    def __init__(self, markup, cb):
+        super().__init__(markup=markup)
+        self.cb = cb
+
+    def selectable(self):
+        return True
+
+    def keypress(self, size, key):
+        logger.debug(f"in keypress of the selectabletext widget with key: *{key}*")
+        if key in ['enter', ' ']:
+            self.cb(self.text)
+            return
+        elif key == 'esc':
+            self.cb('')
+            return
+
+        return key
+
+
+class PopUpDialog(urwid.WidgetWrap):
+    """A dialog that appears with nothing but a close button"""
+
+    signals: ClassVar[list[str]] = ["close"]
+
+    def __init__(self, options, cb, offset: int = 2):
+        # close_button = urwid.Button("Cancel")
+        # urwid.connect_signal(close_button, "click", lambda button: self._emit("close"))
+
+        # the item is offset for better alignment within the linebox
+        items = [urwid.AttrMap(urwid.Padding(SelectableText(f"{item}", cb), align='left', left=offset, right=0), '', 'reveal focus') for item in options.items]
+
+        dialog = urwid.LineBox(
+            urwid.ListBox(
+                urwid.SimpleListWalker(items)
+            ),
+            tline=u' ',
+            tlcorner=u'│',
+            trcorner=u'│',)
+        super().__init__(urwid.AttrMap(dialog, "popbg"))
+
+
+class PullDown(urwid.PopUpLauncher):
+
+    def __init__(self, options: PullDownOptions) -> None:
+        self.options = options
+        self.selected_option = self.options.default
+        super().__init__(CustomButton(self.selected_option, on_press=self.open_pop_up))
+        # urwid.connect_signal(self.original_widget, "click", lambda button: self.open_pop_up())
+
+    def create_pop_up(self) -> PopUpDialog:
+        pop_up = PopUpDialog(self.options, self.cb_selected)
+        return pop_up
+
+    def open_pop_up(self, *args):
+        self._pop_up_widget = self.create_pop_up()
+        self._invalidate()
+
+    def cb_selected(self, content):
+        logger.debug(content)
+        if content:
+            self.selected_option = content
+        self._original_widget = CustomButton(self.selected_option, on_press=self.open_pop_up)
+        # urwid.connect_signal(self.original_widget, "click", lambda button: self.open_pop_up())
+        self.close_pop_up()
+
+    @property
+    def width(self):
+        max_options_width = max([len(item) for item in self.options])
+        return max([self.min_width, max_options_width])
+
+    @property
+    def height(self):
+        return len(self.options.items) + 2
+
+    def get_pop_up_parameters(self):
+        """Handle the positioning of the popup relative to the original widget
+
+        A -1 value for left is used to account for the positioning when a LineBox is used to wrap
+        the original widget
+        """
+        return {"left": -1, "top": 1, "overlay_width": self.options.width, "overlay_height": self.height}
