@@ -256,6 +256,14 @@ class DataCollector(Collector):
             self.health.msg = 'No subsystems found'
             return
 
+        # check if the nqn exists if it has been provided
+        if self.parent.subsystem_nqn:
+            if self.parent.subsystem_nqn not in self.nqn_list:
+                logger.error("nqn provided is not present on the gateway")
+                self.health.rc = 12
+                self.health.msg = "Subsystem NQN provided not found"
+                return
+
         self.log_connection()
 
     def call_grpc_api(self, method_name, request):
