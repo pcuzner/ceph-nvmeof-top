@@ -29,6 +29,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--client-cert", type=str, default='', help='Path to client cert')
     parser.add_argument("--client-key", type=str, default='', help='Path to client key')
     parser.add_argument("--ssl-config", type=str, default='', help='YAML file that contains the certs and keys inline')
+    parser.add_argument("--duration", type=int, help='number of seconds to run batch mode for')
     args = parser.parse_args()
 
     return args
@@ -46,7 +47,12 @@ if __name__ == "__main__":
         sys.exit(4)
 
     if not args.subsystem:
+        # this will change at somepoint, allowing the user to select an nqn in the UI
         print("You must provide a subsystem NQN")
+        sys.exit(4)
+
+    if args.duration and args.count:
+        print("You can not use count and duration options")
         sys.exit(4)
 
     ok, msg = certs_ok(args)
