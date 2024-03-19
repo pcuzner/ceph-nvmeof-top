@@ -7,7 +7,7 @@ import time
 import logging
 import urwid  # type: ignore
 from nvmeof_top.ui import palette, Header, SubsystemInfo, NamespaceTable, HelpInformation, Options, CPUStats
-from typing import Union
+from typing import Union, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +234,8 @@ class NVMeoFTop:
 
     def console_mode(self) -> None:
         logger.info(f"Running in console mode querying {self.args.subsystem}")
+        if self.args.duration:
+            logger.info("User provided a run duration, which is ignored in UI mode")
         self.help = HelpInformation(self)
         self.header = Header(self)
         self.cpustats = CPUStats(self)
@@ -263,6 +265,10 @@ class NVMeoFTop:
         ctr = 0
         try:
             print("waiting for samples...")
+            end_time: Optional[float] = None
+            if self.args.duration:
+                end_time = time.time() + self.args.duration
+
             while not event.is_set():
                 if not self.collector.ready:
                     abort(self.collector.health.rc, self.collector.health.msg)
@@ -272,7 +278,11 @@ class NVMeoFTop:
                     if self.args.count:
                         ctr += 1
                         if ctr > self.args.count:
+                            logger.info('nvmeof-top stopped - iteration limit reached')
                             break
+                    if end_time and time.time() > end_time:
+                        logger.info('nvmeof-top stopped - time limit reached')
+                        break
                 event.wait(self.delay)
 
         except KeyboardInterrupt:
