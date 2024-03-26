@@ -183,7 +183,7 @@ class Collector:
     def reset_namespace_data(self):
         logger.debug("resetting namespace and io counters due to subsystem change")
         self._sample_count = 0
-        self.namespaces.clear()
+        del self.namespaces[:]   # Clear the list of namespace objects
         self.iostats.clear()
 
     def log_connection(self):
