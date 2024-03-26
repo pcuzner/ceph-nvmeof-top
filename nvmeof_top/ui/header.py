@@ -28,8 +28,8 @@ class Header(GenericComponent):
         return urwid.Columns([
             (10, urwid.Text((color_attr, 'nvmeof-top'), align='left')),
             (20, urwid.Text(('normal', f"   GW vers: {self.parent.collector.gw_info.version}"))),
-            (14, urwid.Text(('normal', f"Subsystems: {len(self.parent.collector.nqn_list):>2}"))),
-            urwid.Text(('normal', f"IP Address: {self.parent.args.server_addr}")),
+            (27, urwid.Text(('normal', f"GW Address: {self.parent.args.server_addr}"))),
+            (15, urwid.Text(('normal', f"Subsystems: {len(self.parent.collector.nqn_list)}"))),
             urwid.Text(''),
             urwid.Text([
                 pause,
