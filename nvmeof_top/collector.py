@@ -300,7 +300,7 @@ class DataCollector(Collector):
             for ns in self.namespaces:
                 tg.create_task(asyncio.to_thread(self._get_ns_iostats, ns))
 
-            subsystem_task = tg.create_task(asyncio.to_thread(self._get_subsystems))
+            subsystem_task = tg.create_task(asyncio.to_thread(self._get_all_subsystems))
             connections_task = tg.create_task(asyncio.to_thread(self._get_connections))
 
         self.subsystems = subsystem_task.result()
@@ -356,6 +356,7 @@ class DataCollector(Collector):
                     return
                 self.timestamp = time.time()
                 logger.debug(f"event loop waiting for {self.parent.delay}s")
+                logger.debug(f"nqn_list is : {self.nqn_list}")
             event.wait(self.parent.delay)
 
     def run(self):
