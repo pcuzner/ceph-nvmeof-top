@@ -143,6 +143,10 @@ class Collector:
         return [subsys.nqn for subsys in self.subsystems.subsystems]
 
     @property
+    def total_namespaces(self):
+        return sum([subsys.namespace_count for subsys in self.subsystems.subsystems])
+
+    @property
     def total_bandwidth(self):
         return sum([stats.total_bytes_rate for _, stats in self.iostats.items()])
 
@@ -418,6 +422,7 @@ class DummyCollector(Collector):
             subsys = DummyObject()
             subsys.nqn = f"nqn.2016-06.io.spdk:cnode{n}"
             subsys.max_namespaces = 256
+            subsys.namespace_count = self.namespace_count
             subsystems.subsystems.append(subsys)
         return subsystems
 
