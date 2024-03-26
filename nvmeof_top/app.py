@@ -45,6 +45,7 @@ class NVMeoFTop:
         self.options: Options
         self.sort_key = 'NSID'
         self.refresh_paused = False
+        self.min_refresh_interval = 1
         self.reverse_sort = False
 
         self.help: HelpInformation
