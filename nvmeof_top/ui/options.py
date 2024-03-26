@@ -38,7 +38,7 @@ class Options(GenericComponent):
 
         if not self.valid_delay():
             logger.info(f"user supplied an invalid delay value: {self.input_delay.edit_text}")
-            self.error = urwid.Text(('error', "'Delay' must be set a positive number > 0"))
+            self.error = urwid.Text(('error', f"'Delay' must be set a positive number >= {self.parent.min_refresh_interval}"))
             self.current_delay = self.input_delay.edit_text
             self.update()
             self.container.set_focus(5)
@@ -48,9 +48,11 @@ class Options(GenericComponent):
         return True
 
     def valid_delay(self):
+        # catch null delay value
         if len(self.input_delay.edit_text) == 0:
             return False
-        if int(self.input_delay.edit_text) < 1:
+
+        if int(self.input_delay.edit_text) < self.parent.min_refresh_interval:
             return False
         return True
 
