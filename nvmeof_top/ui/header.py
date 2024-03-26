@@ -30,6 +30,7 @@ class Header(GenericComponent):
             (20, urwid.Text(('normal', f"   GW vers: {self.parent.collector.gw_info.version}"))),
             (27, urwid.Text(('normal', f"GW Address: {self.parent.args.server_addr}"))),
             (15, urwid.Text(('normal', f"Subsystems: {len(self.parent.collector.nqn_list)}"))),
+            (16, urwid.Text(('normal', f"Namespaces: {self.parent.collector.total_namespaces}"))),
             urwid.Text(''),
             urwid.Text([
                 pause,
