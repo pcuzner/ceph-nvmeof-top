@@ -5,6 +5,9 @@ import regex  # type: ignore
 import logging
 import yaml  # type: ignore
 from typing import Tuple
+from packaging import version
+import nvmeof_top.defaults as DEFAULT
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,3 +114,10 @@ def valid_uuid(uuid_str: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def valid_gw_version(gw_version_str: str) -> Tuple[bool, str]:
+    gw_version = version.Version(gw_version_str)
+    if gw_version >= DEFAULT.min_version:
+        return True, 'OK'
+    return False, f"Incompatible gateway version. nvmeof-top requires {DEFAULT.min_version} or above"
