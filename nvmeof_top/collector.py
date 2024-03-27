@@ -5,7 +5,7 @@ import time
 import random
 import grpc  # type: ignore
 import logging
-from .utils import lb_group, bytes_to_MB
+from .utils import lb_group, bytes_to_MB, valid_gw_version
 from typing import Dict
 
 event = threading.Event()
@@ -247,6 +247,15 @@ class DataCollector(Collector):
         if self.health.rc > 0:
             logger.error('Unable to retrieve gataway information')
             return
+
+        gw_ok, msg = valid_gw_version(self.gw_info.version)
+        if not gw_ok:
+            logger.error(msg)
+            self.health.rc = 8
+            self.health.msg = msg
+            return
+        else:
+            logger.debug(f"Gateway version {self.gw_info.version} passed version check")
 
         self.subsystems = self._get_all_subsystems()
         if self.subsystems.status > 0:
